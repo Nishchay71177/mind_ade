@@ -9,13 +9,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
-
   try {
     const { sessionId, content } = req.body || {};
     if (!sessionId || !content) {
       return res.status(400).json({ message: 'sessionId and content are required' });
     }
-
     // Validate using zod schema (sender must be 'user' | 'ai'; we set user here)
     const parsed = insertChatMessageSchema.safeParse({
       sessionId,
@@ -26,28 +24,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!parsed.success) {
       return res.status(400).json({ message: 'Invalid message payload', issues: parsed.error.issues });
     }
-
     // Save user message
     const userMessage = await storage.insertChatMessage(parsed.data);
 
-    // Get AI response + mood
-    const analysis = await groqService.analyzeMessageAndRespond(content);
+    // Get the last N messages for context (e.g., last 10, adjust as needed)
+    const sessionMessages = await storage.getChatMessages(sessionId);
+    const conversationHistory = sessionMessages
+      .filter(msg => msg.sender) // (this gets all; you can refine if needed)
+      .map(msg => msg.content);
+
+    // Get AI response with mood analysis and context
+    const aiResponse = await groqService.analyzeMessageAndRespond(content, conversationHistory);
 
     // Save AI message
     const aiMessage = await storage.insertChatMessage({
       sessionId,
-      content: analysis.response,
+      content: aiResponse.response,
       sender: 'ai',
-      moodScore: analysis.moodScore
+      moodScore: aiResponse.moodScore
     });
+
+    // Optionally update session mood average
+    const moodScores = sessionMessages
+      .filter(msg => typeof msg.moodScore === 'number' && !isNaN(msg.moodScore))
+      .map(msg => msg.moodScore!);
+
+    if (typeof aiResponse.moodScore === 'number' && !isNaN(aiResponse.moodScore)) {
+      moodScores.push(aiResponse.moodScore); // include current AI msg
+    }
+
+    if (moodScores.length > 0) {
+      const averageMood = moodScores.reduce((sum, score) => sum + score, 0) / moodScores.length;
+      await storage.updateChatSessionMoodScore(sessionId, averageMood);
+    }
 
     return res.status(200).json({
       userMessage,
       aiMessage,
       moodAnalysis: {
-        score: analysis.moodScore,
-        sentiment: analysis.sentiment,
-        summary: analysis.summary
+        score: aiResponse.moodScore,
+        sentiment: aiResponse.sentiment,
+        summary: aiResponse.summary
       }
     });
   } catch (err) {
