@@ -39,7 +39,7 @@ export class GroqService {
         { role: "system", content: systemPrompt },
         ...conversationHistory.map((msg, index) => ({
           role: index % 2 === 0 ? "user" : "assistant",
-          content: msg
+          content: msg,
         })),
         { role: "user", content: message }
       ];
@@ -111,7 +111,7 @@ export class GroqService {
 
       const data: GroqResponse = await response.json();
       const analysis = JSON.parse(data.choices[0]?.message?.content || "{}");
-      
+
       // Validate and provide defaults
       return {
         score: Math.max(1, Math.min(10, analysis.score || 5)),
@@ -128,16 +128,17 @@ export class GroqService {
       };
     }
   }
-  async analyzeMessageAndRespond(message: string, conversationHistory: string[] = []): Promise<any> {
-  // In the implementation, pass conversationHistory (as in generateResponse).
-}
-
-   
+  async analyzeMessageAndRespond(message: string, conversationHistory: string[] = []): Promise<{
+    response: string;
+    moodScore: number;
+    sentiment: string;
+    summary: string;
+    main
   }> {
     try {
       // Get AI response and mood analysis in parallel
       const [response, moodAnalysis] = await Promise.all([
-        this.generateResponse(message),
+        this.generateResponse(message, conversationHistory),
         this.analyzeMood(message)
       ]);
 
@@ -158,5 +159,3 @@ export class GroqService {
     }
   }
 }
-
-export const groqService = new GroqService();
