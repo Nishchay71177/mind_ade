@@ -128,12 +128,12 @@ export class GroqService {
       };
     }
   }
-
   async analyzeMessageAndRespond(message: string, conversationHistory: string[] = []): Promise<{
     response: string;
     moodScore: number;
     sentiment: string;
     summary: string;
+    main
   }> {
     try {
       // Get AI response and mood analysis in parallel
