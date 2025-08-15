@@ -112,6 +112,10 @@ export class MemoryStorage implements IStorage {
     
     return chatMessage;
   }
+  async deleteChatSessionAndMessages(sessionId: string): Promise<void> {
+  this.chatMessages.delete(sessionId);
+  this.chatSessions.delete(sessionId);
+  }
 
   async getChatMessages(sessionId: string): Promise<ChatMessage[]> {
     return this.chatMessages.get(sessionId) || [];
